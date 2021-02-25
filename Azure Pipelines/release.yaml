@@ -1,1 +1,40 @@
-
+- stage: Deploy
+  jobs:
+  - job: Deploy
+    pool:
+      name: Hosted VS2017
+    steps:
+    - task: DownloadPipelineArtifact@2
+      inputs:
+        buildType: 'current'
+        artifactName: 'drop'
+        targetPath: '$(System.ArtifactsDirectory)'
+    - task: AzureKeyVault@1
+      inputs:
+        azureSubscription: 'Key Vault Connection'
+        KeyVaultName: 'PartsUnlimited-KV-KM'
+        SecretsFilter: '*'
+        RunAsPreJob: false
+    
+    - task: AzureResourceManagerTemplateDeployment@3
+      inputs:
+        deploymentScope: 'Resource Group'
+        azureResourceManagerConnection: 'Azure subscription 1(1)(da65dbde-58e2-4d0a-b5fc-d4f77f4cc119)'
+        subscriptionId: 'da65dbde-58e2-4d0a-b5fc-d4f77f4cc119'
+        action: 'Create Or Update Resource Group'
+        resourceGroupName: 'PartsUnlimtedRG'
+        location: 'East US'
+        templateLocation: 'Linked artifact'
+        csmFile: '$(System.ArtifactsDirectory)/**/FullEnvironmentSetupMerged.json'
+        csmParametersFile: '$(System.ArtifactsDirectory)/**/FullEnvironmentSetupMerged.param.json'
+        overrideParameters: '-WebsiteName $(WebsiteName) -PUL_ServerName $(ServerName) -PUL_DBPassword $(AdminPassword) -PUL_DBPasswordForTest $(AdminTestPassword) -PUL_HostingPlanName $(HostingPlan)'
+        deploymentMode: 'Incremental'
+    
+    - task: AzureRmWebAppDeployment@4
+      inputs:
+        ConnectionType: 'AzureRM'
+        azureSubscription: 'Azure subscription 1(da65dbde-58e2-4d0a-b5fc-d4f77f4cc119)'
+        appType: 'webApp'
+        WebAppName: '$(WebsiteName)'
+        packageForLinux: '$(System.ArtifactsDirectory)/**/*.zip'
+        
